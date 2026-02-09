@@ -1,0 +1,38 @@
+# Пример проектной конфигурации CI Farm
+# Скопируйте в корень проекта как .ci-farm.yaml
+
+project:
+  # Команда сборки
+  # Если не указана, CI Farm попробует определить автоматически
+  build_command: "cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)"
+
+  # Команды, выполняемые локально перед синхронизацией
+  pre_sync:
+    - "git submodule update --init --recursive"
+
+  # Команды, выполняемые на slave после успешной сборки
+  post_build:
+    - "ctest --test-dir build --output-on-failure"
+    - "cp build/bin/* /mnt/artifacts/"
+
+  # Файлы и директории, исключаемые из синхронизации
+  exclude:
+    - .git
+    - .gitignore
+    - __pycache__
+    - "*.pyc"
+    - node_modules
+    - .venv
+    - venv
+    - .env
+    - "*.egg-info"
+    - dist
+    - build
+    - .pytest_cache
+    - .ruff_cache
+    - "*.o"
+    - "*.a"
+    - "*.so"
+
+  # Таймаут сборки в секундах (по умолчанию 3600 = 1 час)
+  timeout: 7200
