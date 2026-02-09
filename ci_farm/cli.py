@@ -4,6 +4,7 @@ import argparse
 import shlex
 import sys
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -11,7 +12,13 @@ from rich.table import Table
 from . import __version__
 from .builder import detect_build_command, execute_build
 from .config import Config, SlaveConfig, GLOBAL_CONFIG_PATH
-from .slave import check_slave_available, find_available_slave, SlaveConnection
+from .slave import (
+    DEFAULT_CHECK_TOOLS,
+    SlaveConnection,
+    SlaveConnectionError,
+    check_slave_available,
+    find_available_slave,
+)
 
 
 console = Console()
@@ -79,6 +86,22 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_tools_check(tools: list[tuple[str, Optional[str]]]) -> None:
+    """Display tools availability check results."""
+    table = Table(title="Tools Check")
+    table.add_column("Tool", style="cyan")
+    table.add_column("Status")
+    table.add_column("Version", style="dim")
+
+    for name, version in tools:
+        if version is not None:
+            table.add_row(name, "[green]installed[/green]", version)
+        else:
+            table.add_row(name, "[red]missing[/red]", "")
+
+    console.print(table)
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     """Add a new slave to configuration."""
     config = Config.load()
@@ -97,9 +120,20 @@ def cmd_add(args: argparse.Namespace) -> int:
         build_dir=args.build_dir,
     )
 
-    available, error = check_slave_available(new_slave)
-    if not available:
-        console.print(f"[yellow]Warning: Cannot connect to slave: {error}[/yellow]")
+    try:
+        with SlaveConnection(new_slave) as conn:
+            tools = conn.check_tools(DEFAULT_CHECK_TOOLS)
+            _print_tools_check(tools)
+
+            missing = [name for name, version in tools if version is None]
+            if missing and not args.force:
+                console.print(
+                    "[yellow]Some tools are missing. "
+                    "Use --force to add anyway[/yellow]"
+                )
+                return 1
+    except SlaveConnectionError as e:
+        console.print(f"[yellow]Warning: Cannot connect to slave: {e}[/yellow]")
         if not args.force:
             console.print("[yellow]Use --force to add anyway[/yellow]")
             return 1

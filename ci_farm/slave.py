@@ -12,6 +12,16 @@ from .config import SlaveConfig
 LOCK_FILE_NAME = ".ci-farm.lock"
 CONNECTION_TIMEOUT = 10
 
+DEFAULT_CHECK_TOOLS = [
+    "python3",
+    "gcc",
+    "g++",
+    "make",
+    "cmake",
+    "rsync",
+    "git",
+]
+
 
 class SlaveConnectionError(Exception):
     """Failed to connect to slave."""
@@ -156,6 +166,33 @@ class SlaveConnection:
             on_stderr(stderr_buffer)
 
         return exit_status
+
+    def check_tools(self, tools: list[str]) -> list[tuple[str, Optional[str]]]:
+        """Check availability of tools on the slave."""
+        tools_str = " ".join(tools)
+        check_script = (
+            f'for tool in {tools_str}; do '
+            'if command -v "$tool" > /dev/null 2>&1; then '
+            'ver=$("$tool" --version 2>&1 | head -1); '
+            'echo "FOUND:$tool:$ver"; '
+            'else echo "MISSING:$tool"; fi; done'
+        )
+
+        output_lines: list[str] = []
+        self.exec_command(check_script, on_stdout=output_lines.append)
+
+        results: list[tuple[str, Optional[str]]] = []
+        for line in output_lines:
+            if line.startswith("FOUND:"):
+                parts = line.split(":", 2)
+                name = parts[1] if len(parts) > 1 else ""
+                version = parts[2] if len(parts) > 2 else ""
+                results.append((name, version))
+            elif line.startswith("MISSING:"):
+                name = line.split(":", 1)[1] if ":" in line else ""
+                results.append((name, None))
+
+        return results
 
     def get_lock_info(self) -> Optional[tuple[str, float]]:
         """Get information about current lock."""
