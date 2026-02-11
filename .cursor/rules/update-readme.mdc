@@ -1,0 +1,14 @@
+---
+description: Always update README.md when adding or changing features
+alwaysApply: true
+---
+
+# README Update Rule
+
+When adding new features, commands, options, or changing existing behavior:
+
+- Update README.md to reflect the changes
+- Add new commands to the commands table
+- Add new options to the relevant options table
+- Add usage examples for new features
+- Keep the existing README structure and language (Russian)
