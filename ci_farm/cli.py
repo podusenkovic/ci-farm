@@ -11,7 +11,8 @@ from rich.table import Table
 
 from . import __version__
 from .builder import detect_build_command, execute_build
-from .config import Config, SlaveConfig, GLOBAL_CONFIG_PATH
+from .config import GLOBAL_CONFIG_PATH, Config, SlaveConfig
+from .monitor import run_monitor
 from .slave import (
     DEFAULT_CHECK_TOOLS,
     SlaveConnection,
@@ -20,11 +21,10 @@ from .slave import (
     find_available_slave,
 )
 
-
 console = Console()
 
 KNOWN_SUBCOMMANDS = frozenset({
-    "build", "status", "add", "remove", "init", "config", "unlock",
+    "build", "status", "add", "remove", "init", "config", "unlock", "monitor",
 })
 
 
@@ -233,6 +233,17 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_monitor(args: argparse.Namespace) -> int:
+    """Launch live monitoring dashboard."""
+    config = Config.load()
+
+    if not config.slaves:
+        console.print("[yellow]No slaves configured. Run 'ci add' first.[/yellow]")
+        return 0
+
+    return run_monitor(config, args.interval, console)
+
+
 def cmd_unlock(args: argparse.Namespace) -> int:
     """Force unlock a slave."""
     config = Config.load()
@@ -368,6 +379,13 @@ def create_parser() -> argparse.ArgumentParser:
     config_parser = subparsers.add_parser("config", help="Show configuration")
     config_parser.add_argument("path", nargs="?", help="Project path")
 
+    # monitor command
+    monitor_parser = subparsers.add_parser("monitor", help="Live monitoring dashboard")
+    monitor_parser.add_argument(
+        "--interval", "-i", type=int, default=5,
+        help="Refresh interval in seconds (default: 5)",
+    )
+
     # unlock command
     unlock_parser = subparsers.add_parser("unlock", help="Force unlock a slave")
     unlock_parser.add_argument("name", help="Slave name")
@@ -398,6 +416,7 @@ def main() -> int:
             "remove": cmd_remove,
             "init": cmd_init,
             "config": cmd_config,
+            "monitor": cmd_monitor,
             "unlock": cmd_unlock,
         }
 

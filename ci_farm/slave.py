@@ -61,11 +61,7 @@ class SlaveConnection:
         try:
             self.client.connect(**connect_kwargs)
             self.sftp = self.client.open_sftp()
-        except (
-            paramiko.SSHException,
-            socket.error,
-            socket.timeout,
-        ) as e:
+        except (OSError, paramiko.SSHException, socket.timeout) as e:
             raise SlaveConnectionError(f"Failed to connect to {self.config.name}: {e}") from e
 
     def disconnect(self) -> None:

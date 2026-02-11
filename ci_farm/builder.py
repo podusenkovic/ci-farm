@@ -1,14 +1,13 @@
 """Build execution and project synchronization."""
 
 import subprocess
-import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from rich.console import Console
 
-from .config import Config, ProjectConfig, SlaveConfig
-from .slave import SlaveConnection, SlaveBusyError
+from .config import Config, SlaveConfig
+from .slave import SlaveConnection
 
 BUILD_MARKERS = {
     "Makefile": "make",
@@ -183,8 +182,8 @@ def execute_build(
                         conn.exec_command(
                             post_cmd,
                             working_dir=remote_path,
-                            on_stdout=lambda l: console.print(f"[dim]{l}[/dim]"),
-                            on_stderr=lambda l: console.print(f"[red]{l}[/red]"),
+                            on_stdout=lambda line: console.print(f"[dim]{line}[/dim]"),
+                            on_stderr=lambda line: console.print(f"[red]{line}[/red]"),
                         )
 
                 console.print()
