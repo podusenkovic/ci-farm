@@ -160,6 +160,7 @@ ci --git --commit abc123def make -j4
 | `--auto`, `-a` | Автовыбор свободного slave |
 | `--git`, `-g` | Синхронизация через git fetch+checkout вместо rsync |
 | `--commit` | Хеш коммита для checkout (подразумевает `--git`, по умолчанию: HEAD) |
+| `--build-dir`, `-d` | Переопределить рабочую директорию на slave |
 
 ### Опции `ci monitor`
 

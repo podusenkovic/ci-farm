@@ -190,6 +190,7 @@ def execute_build(
     console: Optional[Console] = None,
     git_sync: bool = False,
     commit: Optional[str] = None,
+    build_dir: Optional[str] = None,
 ) -> int:
     """Execute full build pipeline: sync -> build -> report."""
     if console is None:
@@ -210,6 +211,9 @@ def execute_build(
     if not command:
         console.print("[red]Could not detect build command. Specify it in config or CLI.[/red]")
         return 1
+
+    if build_dir:
+        slave.build_dir = build_dir
 
     console.print(f"[bold green]Building on:[/bold green] {slave.name} ({slave.host})")
 

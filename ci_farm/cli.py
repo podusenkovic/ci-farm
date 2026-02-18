@@ -61,6 +61,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         console=console,
         git_sync=git_sync,
         commit=args.commit,
+        build_dir=args.build_dir,
     )
 
 
@@ -277,6 +278,7 @@ def cmd_run(argv: list[str]) -> int:
     auto = False
     git_sync = False
     commit = None
+    build_dir = None
 
     i = 0
     while i < len(argv):
@@ -301,6 +303,13 @@ def cmd_run(argv: list[str]) -> int:
                 i += 2
                 continue
             console.print("[red]--commit requires a value[/red]")
+            return 1
+        if argv[i] == "--build-dir":
+            if i + 1 < len(argv):
+                build_dir = argv[i + 1]
+                i += 2
+                continue
+            console.print("[red]--build-dir requires a path[/red]")
             return 1
         if argv[i] == "--":
             i += 1
@@ -339,6 +348,7 @@ def cmd_run(argv: list[str]) -> int:
         console=console,
         git_sync=git_sync,
         commit=commit,
+        build_dir=build_dir,
     )
 
 
@@ -349,7 +359,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="Simple distributed CI for local network devices",
         epilog=(
             "shorthand:\n"
-            "  ci [--on SLAVE] [--auto] [--git] [--commit HASH] <command> [args...]\n"
+            "  ci [--on SLAVE] [--auto] [--git] [--commit HASH] [--build-dir PATH] <command> [args...]\n"
             "  Run any command on a slave (syncs project first).\n"
             "\n"
             "examples:\n"
@@ -376,6 +386,7 @@ def create_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--git", "-g", action="store_true",
                              help="Use git fetch+checkout instead of rsync")
     build_parser.add_argument("--commit", help="Commit hash to checkout (implies --git, default: HEAD)")
+    build_parser.add_argument("--build-dir", "-d", help="Override remote build directory")
 
     # status command
     subparsers.add_parser("status", help="Show slaves status")
