@@ -1,5 +1,6 @@
 """Build execution and project synchronization."""
 
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -88,6 +89,74 @@ def sync_project(
     return remote_path
 
 
+def get_git_info(project_path: Path) -> tuple[str, str]:
+    """Get git remote URL and current commit hash."""
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_path,
+            text=True,
+            stderr=subprocess.PIPE,
+        ).strip()
+    except subprocess.CalledProcessError:
+        raise BuildError(f"Not a git repository: {project_path}")
+
+    try:
+        remote_url = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            cwd=project_path,
+            text=True,
+            stderr=subprocess.PIPE,
+        ).strip()
+    except subprocess.CalledProcessError:
+        raise BuildError("No 'origin' remote configured")
+
+    return remote_url, commit
+
+
+def sync_project_git(
+    project_path: Path,
+    slave: SlaveConfig,
+    conn: SlaveConnection,
+    console: Console,
+    commit: Optional[str] = None,
+) -> str:
+    """Sync project to slave using git fetch + checkout by commit hash."""
+    project_name = project_path.name
+    remote_path = f"{slave.build_dir}/{project_name}"
+
+    remote_url, current_commit = get_git_info(project_path)
+    target_commit = commit or current_commit
+
+    console.print(f"[dim]Git sync to {slave.name}:{remote_path}[/dim]")
+    console.print(f"[dim]Commit: {target_commit[:12]}[/dim]")
+    console.print(f"[dim]Remote: {remote_url}[/dim]")
+
+    q_path = shlex.quote(remote_path)
+    q_url = shlex.quote(remote_url)
+    q_commit = shlex.quote(target_commit)
+
+    sync_script = " && ".join([
+        f"(test -d {q_path}/.git || git clone {q_url} {q_path})",
+        f"cd {q_path}",
+        f"git remote set-url origin {q_url}",
+        f"git fetch origin {q_commit}",
+        f"git checkout -f {q_commit}",
+        "git submodule update --init --recursive",
+    ])
+
+    exit_code = conn.exec_command(
+        sync_script,
+        on_stdout=lambda line: console.print(f"[dim]{line}[/dim]"),
+        on_stderr=lambda line: console.print(f"[dim]{line}[/dim]"),
+    )
+
+    if exit_code != 0:
+        raise BuildError(f"Git sync failed with code {exit_code}")
+
+    return remote_path
+
+
 def run_build(
     conn: SlaveConnection,
     remote_path: str,
@@ -119,6 +188,8 @@ def execute_build(
     slave_name: Optional[str] = None,
     build_command: Optional[str] = None,
     console: Optional[Console] = None,
+    git_sync: bool = False,
+    commit: Optional[str] = None,
 ) -> int:
     """Execute full build pipeline: sync -> build -> report."""
     if console is None:
@@ -161,12 +232,21 @@ def execute_build(
                     console.print(f"[dim]Pre-sync: {pre_cmd}[/dim]")
                     subprocess.run(pre_cmd, shell=True, cwd=project_path, check=True)
 
-                remote_path = sync_project(
-                    project_path,
-                    slave,
-                    config.project.exclude,
-                    console,
-                )
+                if git_sync:
+                    remote_path = sync_project_git(
+                        project_path,
+                        slave,
+                        conn,
+                        console,
+                        commit=commit,
+                    )
+                else:
+                    remote_path = sync_project(
+                        project_path,
+                        slave,
+                        config.project.exclude,
+                        console,
+                    )
 
                 exit_code = run_build(
                     conn,

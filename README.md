@@ -4,7 +4,7 @@
 
 ## Возможности
 
-- Синхронизация проекта на удалённую машину через rsync
+- Синхронизация проекта на удалённую машину через rsync или git (fetch+checkout по коммиту)
 - Автоматическое определение команды сборки (Make, CMake, npm, Cargo, Go, Python)
 - Стриминг логов сборки в реальном времени
 - Управление несколькими slave-устройствами
@@ -61,6 +61,12 @@ ci build --command="make clean && make"
 
 # Автовыбор свободного slave
 ci build --auto
+
+# Синхронизация через git вместо rsync (checkout текущего коммита)
+ci build --git
+
+# Checkout конкретного коммита на slave (для Gerrit и др.)
+ci build --git --commit=abc123def456
 ```
 
 ## Конфигурация
@@ -141,6 +147,8 @@ project:
 ci make -j4
 ci --on worker1 cargo build --release
 ci --auto npm run build
+ci --git make -j4
+ci --git --commit abc123def make -j4
 ```
 
 ### Опции `ci build`
@@ -150,6 +158,8 @@ ci --auto npm run build
 | `--on`, `-o` | Выбрать конкретный slave |
 | `--command`, `-c` | Переопределить команду сборки |
 | `--auto`, `-a` | Автовыбор свободного slave |
+| `--git`, `-g` | Синхронизация через git fetch+checkout вместо rsync |
+| `--commit` | Хеш коммита для checkout (подразумевает `--git`, по умолчанию: HEAD) |
 
 ### Опции `ci monitor`
 
@@ -197,9 +207,10 @@ CI Farm автоматически определяет команду сбор�
 ## Требования
 
 - Python 3.8+
-- rsync на локальной машине
+- rsync на локальной машине (для режима rsync)
 - SSH доступ к slave-устройствам
-- rsync на slave-устройствах
+- rsync на slave-устройствах (для режима rsync)
+- git на slave-устройствах (для режима `--git`), с доступом к репозиторию
 
 ## Зависимости
 

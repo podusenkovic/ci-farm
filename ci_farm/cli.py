@@ -51,12 +51,16 @@ def cmd_build(args: argparse.Namespace) -> int:
             console.print("[red]No available slaves found[/red]")
             return 1
 
+    git_sync = args.git or bool(args.commit)
+
     return execute_build(
         project_path,
         config,
         slave_name=slave_name,
-        build_command=args.command,
+        build_command=args.build_command,
         console=console,
+        git_sync=git_sync,
+        commit=args.commit,
     )
 
 
@@ -271,6 +275,8 @@ def cmd_run(argv: list[str]) -> int:
     """Execute arbitrary command on a slave."""
     slave_name = None
     auto = False
+    git_sync = False
+    commit = None
 
     i = 0
     while i < len(argv):
@@ -285,6 +291,17 @@ def cmd_run(argv: list[str]) -> int:
             auto = True
             i += 1
             continue
+        if argv[i] == "--git":
+            git_sync = True
+            i += 1
+            continue
+        if argv[i] == "--commit":
+            if i + 1 < len(argv):
+                commit = argv[i + 1]
+                i += 2
+                continue
+            console.print("[red]--commit requires a value[/red]")
+            return 1
         if argv[i] == "--":
             i += 1
             break
@@ -312,12 +329,16 @@ def cmd_run(argv: list[str]) -> int:
             console.print("[red]No available slaves found[/red]")
             return 1
 
+    git_sync = git_sync or bool(commit)
+
     return execute_build(
         project_path,
         config,
         slave_name=slave_name,
         build_command=command,
         console=console,
+        git_sync=git_sync,
+        commit=commit,
     )
 
 
@@ -328,14 +349,16 @@ def create_parser() -> argparse.ArgumentParser:
         description="Simple distributed CI for local network devices",
         epilog=(
             "shorthand:\n"
-            "  ci [--on SLAVE] [--auto] <command> [args...]\n"
+            "  ci [--on SLAVE] [--auto] [--git] [--commit HASH] <command> [args...]\n"
             "  Run any command on a slave (syncs project first).\n"
             "\n"
             "examples:\n"
             "  ci make -j4\n"
             "  ci ./scripts/build-deb.sh --docker --distrib all\n"
             "  ci --on worker1 cargo build --release\n"
-            "  ci --auto npm run build"
+            "  ci --auto npm run build\n"
+            "  ci --git make -j4\n"
+            "  ci --git --commit abc123def make -j4"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -347,9 +370,12 @@ def create_parser() -> argparse.ArgumentParser:
     build_parser = subparsers.add_parser("build", help="Run build on slave")
     build_parser.add_argument("path", nargs="?", default=".", help="Project path")
     build_parser.add_argument("--on", "-o", help="Slave name to use")
-    build_parser.add_argument("--command", "-c", help="Override build command")
+    build_parser.add_argument("--command", "-c", dest="build_command", help="Override build command")
     build_parser.add_argument("--auto", "-a", action="store_true",
                              help="Auto-select available slave")
+    build_parser.add_argument("--git", "-g", action="store_true",
+                             help="Use git fetch+checkout instead of rsync")
+    build_parser.add_argument("--commit", help="Commit hash to checkout (implies --git, default: HEAD)")
 
     # status command
     subparsers.add_parser("status", help="Show slaves status")
